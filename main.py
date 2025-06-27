@@ -40,6 +40,7 @@ def parse_args():
     parser.add_argument('--use_mixup', action='store_true', help='Use mixup data augmentation')
     parser.add_argument('--oversampling', action='store_true', help='Use oversampling data augmentation')
     parser.add_argument('--freeze_backbone', action='store_true', help='Freeze backbone layers for fine-tuning')
+    parser.add_argument('--remove_illegal_faces', action='store_true')
     return parser.parse_args()
 
 def main():
@@ -112,7 +113,8 @@ def main():
             num_workers=args.num_workers,
             seed=args.seed,
             shuffle=True,
-            oversampling=args.oversampling
+            oversampling=args.oversampling,
+            remove_illegal_faces=args.remove_illegal_faces
         )
         logger.info(f"数据加载器已创建，类别顺序为{face_dataset.label2classid}, 共有{len(face_dataset)}个样本")
         

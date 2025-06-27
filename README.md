@@ -19,7 +19,8 @@ for seed in 42 43; do
     --oversampling \
     --use_mixup \
     --model resnet34 \
-    --seed $seed 
+    --seed $seed \
+    --remove_illegal_faces
   
   python main.py \
     --data_file ./prepare_data/croped_data/val_test.csv \

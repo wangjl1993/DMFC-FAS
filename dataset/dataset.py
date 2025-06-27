@@ -27,9 +27,10 @@ class FaceDataset(Dataset):
         "Pixcel-Level": 1,
         "Semantic-Leve": 0,
     }
-    def __init__(self, csv_file, label2classid=None, transform=None, is_train=True):
+    def __init__(self, csv_file, label2classid=None, transform=None, is_train=True, remove_illegal_faces=False):
         self.data_df = pd.read_csv(csv_file)
-       
+        if remove_illegal_faces:
+            self.data_df = self.data_df[self.data_df['face_num'] == 1]
         self.data_folder = os.path.dirname(csv_file)
         self.transform = transform
         if label2classid is not None:
@@ -74,10 +75,10 @@ def worker_init_fn(worker_id):
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
-def build_dataloader(csv_file, is_train, batch_size=32, num_workers=4, seed=42, oversampling=False, **kwargs):
+def build_dataloader(csv_file, is_train, batch_size=32, num_workers=4, seed=42, oversampling=False, remove_illegal_faces=False, **kwargs):
     
 
-    face_dataset = FaceDataset(csv_file, is_train=is_train)
+    face_dataset = FaceDataset(csv_file, is_train=is_train, remove_illegal_faces=remove_illegal_faces)
     
     g = torch.Generator()
     g.manual_seed(seed)
