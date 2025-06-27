@@ -1,4 +1,13 @@
 **.pyc
 exp
 result
-prepare_data
+/prepare_data/*
+!prepare_data/README.md
+!prepare_data/requirements.txt
+!prepare_data/raw_data/
+/prepare_data/raw_data/*
+!prepare_data/raw_data/get_croped_data.py
+!prepare_data/raw_data/get_csv_file.py
+!prepare_data/requirements.txt
+!prepare_data/raw_data/get_croped_data.py
+!prepare_data/raw_data/get_csv_file.py
