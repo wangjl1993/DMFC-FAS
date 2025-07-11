@@ -1,5 +1,5 @@
 **.pyc
-exp
+
 result
 /prepare_data/*
 !prepare_data/README.md
@@ -11,3 +11,14 @@ result
 !prepare_data/requirements.txt
 !prepare_data/raw_data/get_croped_data.py
 !prepare_data/raw_data/get_csv_file.py
+
+/exp/*
+!exp/resnet34+oversampling+use_mixup+seed_42/
+exp/resnet34+oversampling+use_mixup+seed_42/*
+!exp/resnet34+oversampling+use_mixup+seed_42/model_epoch_150.pth
+!exp/resnet34+oversampling+use_mixup+seed_42/train_20250708_093955.log
+!exp/resnet34+oversampling+use_mixup+seed_42/test_epoch150+withTTA/
+exp/resnet34+oversampling+use_mixup+seed_42/test_epoch150+withTTA/*
+!exp/resnet34+oversampling+use_mixup+seed_42/test_epoch150+withTTA/features.npy
+!exp/resnet34+oversampling+use_mixup+seed_42/test_epoch150+withTTA/filenames_labels.csv
+!exp/resnet34+oversampling+use_mixup+seed_42/test_epoch150+withTTA/scores.txt
