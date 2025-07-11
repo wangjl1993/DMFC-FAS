@@ -148,8 +148,6 @@ def inference(model, dataloader, device, save_dir, input_normalizer):
         for file, score in zip(df['filename'], scores):
             score = max(0, min(1, score))
             f.write(f"{file} {1-score}\n")
-
-    
     
 
 def extract_features(model, dataloader, save_dir, device, input_normalizer):
@@ -160,10 +158,11 @@ def extract_features(model, dataloader, save_dir, device, input_normalizer):
     filenames_list = []
     with torch.no_grad():
         pbar = tqdm(dataloader, desc="extract features")
-        for (inputs, labels, _, filenames) in pbar:
-            inputs = inputs.to(device)
-            outputs = model.extract_features(input_normalizer(inputs)).cpu().numpy()
-
+        for ((inputs1, inputs2), labels, _, filenames) in pbar:
+            inputs1, inputs2 = inputs1.to(device), inputs2.to(device)
+            outputs1 = model.extract_features(input_normalizer(inputs1)).cpu().numpy()
+            outputs2 = model.extract_features(input_normalizer(inputs2)).cpu().numpy()
+            outputs = (outputs1+outputs2)/2
             features_list.append(outputs)
             labels_list.append(labels.numpy())
             filenames_list.extend(filenames)

@@ -20,7 +20,9 @@ from pathlib import Path
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PyTorch 6-Class Classification with ResNet')
-    parser.add_argument('--data_file', type=str, default='/home/akuvox2025/SSD4T/jielong.wang/dataset/cv2025/phase1/train_valFake.csv', help='Path to data directory')
+    parser.add_argument('--train_data_file', type=str, default='prepare_data/raw_data/train.csv', help='Path to data directory')
+    parser.add_argument('--test_data_file', type=str, default='prepare_data/raw_data/val_test.csv', help='Path to test_data_file')
+    parser.add_argument('--val_data_file', type=str, default='prepare_data/raw_data/val.csv', help='Path to val_data_file')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
     parser.add_argument('--num_epochs', type=int, default=150, help='Number of epochs to train')
     parser.add_argument('--lr', type=float, default=0.0001, help='Learning rate')
@@ -106,8 +108,8 @@ def main():
             raise NotImplementedError('ReduceLROnPlateau, CosineAnnealingWarmRestarts are supported only')
         
         # Get data loaders
-        data_loader, face_dataset = build_dataloader(
-            args.data_file, 
+        train_data_loader, train_face_dataset = build_dataloader(
+            args.train_data_file, 
             is_train=True, 
             batch_size=args.batch_size, 
             num_workers=args.num_workers,
@@ -116,8 +118,27 @@ def main():
             oversampling=args.oversampling,
             remove_illegal_faces=args.remove_illegal_faces
         )
-        logger.info(f"数据加载器已创建，类别顺序为{face_dataset.label2classid}, 共有{len(face_dataset)}个样本")
+        logger.info(f"数据加载器已创建，类别顺序为{train_face_dataset.label2classid}, 共有{len(train_face_dataset)}个样本")
         
+        test_data_loader1, test_face_dataset1 = build_dataloader(
+            args.test_data_file, 
+            is_train=False, 
+            batch_size=args.batch_size, 
+            num_workers=args.num_workers,
+            seed=args.seed,
+            shuffle=False,
+            use_tta=True
+        )
+
+        test_data_loader2, test_face_dataset2 = build_dataloader(
+            args.test_data_file, 
+            is_train=False, 
+            batch_size=args.batch_size, 
+            num_workers=args.num_workers,
+            seed=args.seed,
+            shuffle=False,
+            use_tta=False
+        )
 
         # Lists to store metrics
         train_losses = []
@@ -128,7 +149,7 @@ def main():
             logger.info(f"\n第 {epoch+1}/{args.num_epochs} 轮训练")
             
             # Train
-            train_loss, train_acc = train_one_epoch(model, data_loader, criterion, optimizer, device, input_normalizer, args.use_mixup)
+            train_loss, train_acc = train_one_epoch(model, train_data_loader, criterion, optimizer, device, input_normalizer, args.use_mixup)
             train_losses.append(train_loss)
             train_accs.append(train_acc)
             logger.info(f"训练损失: {train_loss:.4f}, 训练准确率: {train_acc:.2f}%")
@@ -154,77 +175,52 @@ def main():
                 if (epoch + 1) in save_epochs:
                     torch.save(model.state_dict(), os.path.join(args.save_dir, f'model_epoch_{epoch+1}.pth'))
                     logger.info(f"保存第 {epoch+1} 轮模型，训练准确率: {train_acc:.2f}%")
+                    save_dir1 = Path(args.save_dir) / f"test_epoch{epoch+1}+withTTA"
+                    inference(model, test_data_loader1, device, save_dir1, input_normalizer)
+                    save_dir2 = Path(args.save_dir) / f"test_epoch{epoch+1}+withoutTTA"
+                    inference(model, test_data_loader2, device, save_dir2, input_normalizer)
         
         logger.info("训练完成!")
     
     elif args.mode == 'extract_features':
-        save_dir = Path(args.resume).parent / f'{Path(args.resume).stem}_extracted_features_{Path(args.data_file).stem}'
-        data_loader, face_dataset = build_dataloader(
-            args.data_file, 
+        save_dir = Path(args.resume).parent / f'{Path(args.resume).stem}_extracted_features_{Path(args.train_data_file).stem}'
+        data_loader, _ = build_dataloader(
+            args.train_data_file, 
             is_train=False, 
             batch_size=args.batch_size, 
             num_workers=args.num_workers,
             seed=args.seed,
-            shuffle=False
+            shuffle=False,
+            use_tta=False
         )
-        logger.info(f"数据加载器已创建，类别顺序为{face_dataset.label2classid}, 共有{len(face_dataset)}个样本")
         extract_features(model, data_loader, save_dir, device, input_normalizer)
 
 
-    elif args.mode == "finetune":
-        if args.freeze_backbone:
-            model.freeze_backbone()
-        model.reinit_fc(num_classes=5)
-        model.to(device)
-        logger.info(f"全连接层已重新初始化为{5}类")
-        optimizer = optim.Adam(model.parameters(), lr=args.lr)
-        
-        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, args.T_0, args.T_mult)
-        data_loader, face_dataset = build_finetune_dataloader(
-            args.data_file, 
-            is_train=True, 
-            batch_size=args.batch_size, 
-            num_workers=args.num_workers,
-            seed=args.seed,
-            shuffle=True
-        )
-        logger.info(f"数据加载器已创建，类别顺序为{face_dataset.label2classid}, 共有{len(face_dataset)}个样本")
-        # Lists to store metrics
-        train_losses = []
-        train_accs = []
-        train_loss, train_acc = 0, 0
-        # Training loop
-        for epoch in range(args.num_epochs):
-            logger.info(f"\n第 {epoch+1}/{args.num_epochs} 轮微调")
-            
-            # Train
-            train_loss, train_acc = train_one_epoch(model, data_loader, criterion, optimizer, device, input_normalizer, args.use_mixup)
-            train_losses.append(train_loss)
-            train_accs.append(train_acc)
-            logger.info(f"训练损失: {train_loss:.4f}, 训练准确率: {train_acc:.2f}%")
-            
-            # 记录当前学习率
-            current_lr = optimizer.param_groups[0]['lr']
-            logger.info(f"当前学习率: {current_lr:.6f}")
-
-            scheduler.step()
-            
-            save_epochs = get_minimize_lr_epochs(args.T_0, args.T_mult)
-            if (epoch + 1) in save_epochs:
-                torch.save(model.state_dict(), os.path.join(args.save_dir, f'model_epoch_{epoch+1}.pth'))
-                logger.info(f"保存第 {epoch+1} 轮模型，训练准确率: {train_acc:.2f}%")
-
     elif args.mode == 'inference':
-        save_dir = Path(args.resume).parent / f'{Path(args.resume).stem}_extracted_features_{Path(args.data_file).stem}'
-        data_loader, face_dataset = build_dataloader(
-            args.data_file, 
+        test_data_loader1, _ = build_dataloader(
+            args.test_data_file, 
             is_train=False, 
             batch_size=args.batch_size, 
             num_workers=args.num_workers,
             seed=args.seed,
-            shuffle=False
+            shuffle=False,
+            use_tta=True
         )
-        inference(model, data_loader, device, save_dir, input_normalizer)
+
+        test_data_loader2, _ = build_dataloader(
+            args.test_data_file, 
+            is_train=False, 
+            batch_size=args.batch_size, 
+            num_workers=args.num_workers,
+            seed=args.seed,
+            shuffle=False,
+            use_tta=False
+        )
+        save_dir1 = Path(args.resume).parent / f"{Path(args.resume).stem}_inference_withTTA"
+        save_dir2 = Path(args.resume).parent / f"{Path(args.resume).stem}_inference_withoutTTA"
+        inference(model, test_data_loader1, device, save_dir1, input_normalizer)
+        inference(model, test_data_loader2, device, save_dir2, input_normalizer)
+
 
     else:
         raise ValueError("illegal mode")

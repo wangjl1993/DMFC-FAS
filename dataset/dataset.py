@@ -66,6 +66,58 @@ class FaceDataset(Dataset):
         
         return image, class_id, sub_label, img_name
 
+
+class FaceTestDataset(Dataset):
+    label2classid = {
+        "Live Face": 5,
+        "Cutouts": 4,
+        "Replay": 4,
+        "Print": 4,
+        "Face-Swap": 3,
+        "Video-Driven": 2,
+        "Attibute-Edit": 2,
+        "Pixcel-Level": 1,
+        "Semantic-Leve": 0,
+    }
+    def __init__(self, csv_file, label2classid=None, use_tta=True):
+        self.data_df = pd.read_csv(csv_file)
+
+        self.data_folder = os.path.dirname(csv_file)
+
+        if label2classid is not None:
+            self.label2classid = label2classid
+        self.data_df['class_id'] = self.data_df['sublabel'].apply(lambda x: self.label2classid.get(x, -1))
+
+        self.transform1 = transforms.Compose([
+            transforms.Resize((224, 224)), 
+            transforms.ToTensor(),
+        ])
+        if use_tta:
+            self.transform2 = transforms.Compose([
+                transforms.RandomHorizontalFlip(p=1), 
+                transforms.Resize((224, 224)), 
+                transforms.ToTensor(),
+            ])
+        else:
+            self.transform2 = self.transform1
+
+    def __len__(self):
+        return len(self.data_df)
+
+    def __getitem__(self, idx):
+        img_name = self.data_df.iloc[idx]['filename']
+        img_path = os.path.join(self.data_folder, img_name)
+
+        sub_label = self.data_df.iloc[idx]['sublabel'] 
+        image = Image.open(img_path).convert('RGB')
+        class_id = self.data_df.iloc[idx]['class_id'] 
+        
+        image1 = self.transform1(image)
+        image2 = self.transform2(image)
+        
+        return (image1, image2), class_id, sub_label, img_name
+
+
 def worker_init_fn(worker_id):
     """
     为每个worker设置随机种子，确保数据加载的随机性是可控的
@@ -75,10 +127,12 @@ def worker_init_fn(worker_id):
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
-def build_dataloader(csv_file, is_train, batch_size=32, num_workers=4, seed=42, oversampling=False, remove_illegal_faces=False, **kwargs):
+def build_dataloader(csv_file, is_train, batch_size=32, num_workers=4, seed=42, oversampling=False, remove_illegal_faces=False, use_tta=False, **kwargs):
     
-
-    face_dataset = FaceDataset(csv_file, is_train=is_train, remove_illegal_faces=remove_illegal_faces)
+    if is_train:
+        face_dataset = FaceDataset(csv_file, is_train=is_train, remove_illegal_faces=remove_illegal_faces)
+    else:
+        face_dataset = FaceTestDataset(csv_file, use_tta=use_tta)
     
     g = torch.Generator()
     g.manual_seed(seed)
