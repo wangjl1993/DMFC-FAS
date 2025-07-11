@@ -1,4 +1,4 @@
-# Adaptive Face Anti-Spoofing Through Enhanced Data Manipulation and Feature Alignment Techniques
+# Adaptive Face Anti-Spoofing Through Enhanced Data Manipulation and Feature Contrast Techniques
 
 ## Data Preparation
 Navigate to the `prepare_data` directory and follow the instructions in the README.md file to prepare the data.
